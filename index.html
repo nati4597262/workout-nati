@@ -273,7 +273,7 @@ function toggleSection(bodyId,arrowId){
   arrow.classList.toggle('open',!isOpen);
 }
 
-async function saveWorkout(wid){
+function saveWorkout(wid){
   const w=WORKOUTS.find(x=>x.id===wid);
   const date=document.getElementById('date-'+wid).value;
   const btn=document.getElementById('savebtn-'+wid);
@@ -299,19 +299,33 @@ async function saveWorkout(wid){
   if(!rows.length){errEl.textContent='לא הוזנו נתונים';errEl.style.display='block';return;}
   btn.disabled=true; btn.innerHTML='<span class="spinner"></span>שומר...';
 
-  try{
-    const url=SCRIPT_URL+'?workout='+encodeURIComponent(wid)+'&data='+encodeURIComponent(JSON.stringify(rows));
-    const resp=await fetch(url);
-    const result=await resp.json();
+  const cbName='cb_'+Date.now();
+  const url=SCRIPT_URL+'?workout='+encodeURIComponent(wid)+'&data='+encodeURIComponent(JSON.stringify(rows))+'&callback='+cbName;
+  const script=document.createElement('script');
+  window[cbName]=function(result){
+    delete window[cbName];
+    document.body.removeChild(script);
+    btn.disabled=false; btn.textContent='שמור';
     if(result.status==='ok'){
       history.unshift({id:wid,name:w.name,date,exercises:histEx});
       saveHist();
       okEl.textContent='✓ נשמר בכרטיסיית אימון '+wid;
       okEl.style.display='block';
       setTimeout(()=>{okEl.style.display='none';},4000);
-    } else {throw new Error();}
-  }catch(e){errEl.textContent='שגיאה בשמירה — נסה שוב';errEl.style.display='block';}
-  btn.disabled=false; btn.textContent='שמור';
+    } else {
+      errEl.textContent='שגיאה בשמירה — נסה שוב';
+      errEl.style.display='block';
+    }
+  };
+  script.onerror=function(){
+    delete window[cbName];
+    document.body.removeChild(script);
+    btn.disabled=false; btn.textContent='שמור';
+    errEl.textContent='שגיאה בשמירה — נסה שוב';
+    errEl.style.display='block';
+  };
+  script.src=url;
+  document.body.appendChild(script);
 }
 
 function switchHistTab(tab){
